@@ -955,6 +955,10 @@ window_pane_spawn(struct window_pane *wp, int argc, char **argv,
 #endif
 
 	setblocking(wp->fd, 0);
+    wp->event = bufferevent_socket_new(NULL, wp->fd, BEV_OPT_DEFER_CALLBACKS);
+    bufferevent_setcb(wp->event, window_pane_read_callback, NULL, window_pane_error_callback, wp);
+//	wp->event = bufferevent_new(wp->fd, window_pane_read_callback, NULL,
+//	    window_pane_error_callback, wp);
 
 	wp->event = bufferevent_new(wp->fd, window_pane_read_callback, NULL,
 	    window_pane_error_callback, wp);
@@ -967,6 +971,20 @@ window_pane_spawn(struct window_pane *wp, int argc, char **argv,
 }
 
 static void
+window_pane_wmark_timer(__unused int fd, __unused short events, void *arg)
+{
+    struct window_pane *wp = arg;
+    wp->flags &= ~PANE_DROP;
+    wp->flags |=  PANE_REDRAW;
+    if(!wp->wmark_hits)
+        evtimer_del(wp->wmark_timer);
+    else {
+        struct timeval tv = { .tv_usec = 32000 };
+        evtimer_add(&wp->wmark_timer, &tv);
+    }
+}
+
+static void
 window_pane_read_callback(__unused struct bufferevent *bufev, void *data)
 {
 	struct window_pane	*wp = data;
@@ -974,6 +992,38 @@ window_pane_read_callback(__unused struct bufferevent *bufev, void *data)
 	size_t			 size = EVBUFFER_LENGTH(evb);
 	char			*new_data;
 	size_t			 new_size;
+
+    if (size > READ_FULL_SIZE) {
+        if(wp->wmark_hits < 8)
+            wp->wmark_hits += 4;
+        if(!(wp->flags & PANE_DROP)) {
+            if(wp->wmark_hits >= 8) {
+                wp->flags |= PANE_DROP;
+                wp->flags &= ~PANE_REDRAW;
+                if (!event_initialized(&w->wmark_timer))
+                    evtimer_del(&w->wmark_timer);
+                evtimer_set(&wp->wmark_timer, window_pane_wmark_timer, wp);
+                struct timeval tv = { .tv_usec = 32000 };
+                evtimer_add(&wp->wmark_timer, &tv);
+            }
+        }
+    } else {
+        if(wp->wmark_hits)
+            wp->wmark_hits--;
+    }
+	if (wp->wmark_size == READ_FAST_SIZE) {
+		if (size > READ_FULL_SIZE)
+			wp->wmark_hits++;
+		if (wp->wmark_hits == READ_CHANGE_HITS)
+			window_pane_set_watermark(wp, READ_SLOW_SIZE);
+	} else if (wp->wmark_size == READ_SLOW_SIZE) {
+		if (size < READ_EMPTY_SIZE)
+			wp->wmark_hits++;
+		if (wp->wmark_hits == READ_CHANGE_HITS)
+			window_pane_set_watermark(wp, READ_FAST_SIZE);
+	}
+	log_debug("%%%u has %zu bytes (of %u, %u hits)", wp->id, size,
+	    wp->wmark_size, wp->wmark_hits);
 
 	new_size = size - wp->pipe_off;
 	if (wp->pipe_fd != -1 && new_size > 0) {

@@ -758,6 +758,10 @@ struct window_pane {
 
 	struct event	 resize_timer;
 
+    struct event     wmark_timer;
+//	u_int		     wmark_size;
+	u_int		     wmark_hits;
+
 	struct input_ctx *ictx;
 
 	struct grid_cell colgc;
