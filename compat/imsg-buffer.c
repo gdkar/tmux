@@ -36,35 +36,28 @@ void	ibuf_dequeue(struct msgbuf *, struct ibuf *);
 struct ibuf *
 ibuf_open(size_t len)
 {
-	struct ibuf	*buf;
+	struct ibuf	*buf = NULL;
 
-	if ((buf = calloc(1, sizeof(struct ibuf))) == NULL)
-		return (NULL);
-	if ((buf->buf = malloc(len)) == NULL) {
+	if ((buf = calloc(1, sizeof(*buf)))
+      &&(buf->buf = malloc(len))) {
+        buf->size = buf->max = len;
+        buf->fd = -1;
+    }else{
 		free(buf);
-		return (NULL);
-	}
-	buf->size = buf->max = len;
-	buf->fd = -1;
-
+        buf = NULL;
+    }
 	return (buf);
 }
 
 struct ibuf *
 ibuf_dynamic(size_t len, size_t max)
 {
-	struct ibuf	*buf;
-
-	if (max < len)
-		return (NULL);
-
-	if ((buf = ibuf_open(len)) == NULL)
-		return (NULL);
-
-	if (max > 0)
-		buf->max = max;
-
-	return (buf);
+	struct ibuf	*buf = NULL;
+    if (max >= len
+    && (buf=ibuf_open(len))
+    && (max > 0))
+        (buf)->max = max;
+    return (buf);
 }
 
 int
@@ -77,14 +70,13 @@ ibuf_realloc(struct ibuf *buf, size_t len)
 		errno = ERANGE;
 		return (-1);
 	}
-
-	b = realloc(buf->buf, buf->wpos + len);
-	if (b == NULL)
-		return (-1);
-	buf->buf = b;
-	buf->size = buf->wpos + len;
-
-	return (0);
+	if((b = realloc(buf->buf, buf->wpos + len))) {
+        buf->buf = b;
+        buf->size = buf->wpos + len;
+        return (0);
+    }else{
+        return(-1);
+    }
 }
 
 int
@@ -144,12 +136,11 @@ ibuf_close(struct msgbuf *msgbuf, struct ibuf *buf)
 int
 ibuf_write(struct msgbuf *msgbuf)
 {
-	struct iovec	 iov[IOV_MAX];
-	struct ibuf	*buf;
+	struct iovec	 iov[IOV_MAX] = { { 0, } };
+	struct ibuf	*buf = NULL;
 	unsigned int	 i = 0;
-	ssize_t	n;
+	ssize_t	n = 0;
 
-	memset(&iov, 0, sizeof(iov));
 	TAILQ_FOREACH(buf, &msgbuf->bufs, entry) {
 		if (i >= IOV_MAX)
 			break;
@@ -214,28 +205,24 @@ void
 msgbuf_clear(struct msgbuf *msgbuf)
 {
 	struct ibuf	*buf;
-
-	while ((buf = TAILQ_FIRST(&msgbuf->bufs)) != NULL)
+	while ((buf = TAILQ_FIRST(&msgbuf->bufs)))
 		ibuf_dequeue(msgbuf, buf);
 }
 
 int
 msgbuf_write(struct msgbuf *msgbuf)
 {
-	struct iovec	 iov[IOV_MAX];
-	struct ibuf	*buf;
+	struct iovec	 iov[IOV_MAX] = { { 0, }, };
+	struct ibuf	*buf = NULL;
 	unsigned int	 i = 0;
 	ssize_t		 n;
-	struct msghdr	 msg;
-	struct cmsghdr	*cmsg;
+	struct msghdr	 msg = { .msg_iov = iov };
+	struct cmsghdr	*cmsg = NULL;
 	union {
 		struct cmsghdr	hdr;
 		char		buf[CMSG_SPACE(sizeof(int))];
-	} cmsgbuf;
+	} cmsgbuf = { .buf = { 0, }, };
 
-	memset(&iov, 0, sizeof(iov));
-	memset(&msg, 0, sizeof(msg));
-	memset(&cmsgbuf, 0, sizeof(cmsgbuf));
 	TAILQ_FOREACH(buf, &msgbuf->bufs, entry) {
 		if (i >= IOV_MAX)
 			break;
@@ -246,20 +233,17 @@ msgbuf_write(struct msgbuf *msgbuf)
 			break;
 	}
 
-	msg.msg_iov = iov;
 	msg.msg_iovlen = i;
 
-	if (buf != NULL && buf->fd != -1) {
-		msg.msg_control = (caddr_t)&cmsgbuf.buf;
-		msg.msg_controllen = sizeof(cmsgbuf.buf);
-		cmsg = CMSG_FIRSTHDR(&msg);
-		cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-		cmsg->cmsg_level = SOL_SOCKET;
-		cmsg->cmsg_type = SCM_RIGHTS;
+	if (buf && buf->fd != -1) {
+		msg.msg_control     = (caddr_t)&cmsgbuf.buf;
+		msg.msg_controllen  = sizeof(cmsgbuf.buf);
+		cmsg                = CMSG_FIRSTHDR(&msg);
+		cmsg->cmsg_len      = CMSG_LEN(sizeof(int));
+		cmsg->cmsg_level    = SOL_SOCKET;
+		cmsg->cmsg_type     = SCM_RIGHTS;
         memcpy(CMSG_DATA(cmsg),&buf->fd,sizeof(buf->fd));
-//		*(int *)CMSG_DATA(cmsg) = buf->fd;
 	}
-
 again:
 	if ((n = sendmsg(msgbuf->fd, &msg, 0)) == -1) {
 		if (errno == EINTR)
@@ -268,41 +252,33 @@ again:
 			errno = EAGAIN;
 		return (-1);
 	}
-
 	if (n == 0) {			/* connection closed */
 		errno = 0;
 		return (0);
 	}
-
 	/*
 	 * assumption: fd got sent if sendmsg sent anything
 	 * this works because fds are passed one at a time
 	 */
-	if (buf != NULL && buf->fd != -1) {
+	if (buf && buf->fd != -1) {
 		close(buf->fd);
 		buf->fd = -1;
 	}
-
 	msgbuf_drain(msgbuf, n);
-
 	return (1);
 }
-
 void
 ibuf_enqueue(struct msgbuf *msgbuf, struct ibuf *buf)
 {
 	TAILQ_INSERT_TAIL(&msgbuf->bufs, buf, entry);
 	msgbuf->queued++;
 }
-
 void
 ibuf_dequeue(struct msgbuf *msgbuf, struct ibuf *buf)
 {
 	TAILQ_REMOVE(&msgbuf->bufs, buf, entry);
-
 	if (buf->fd != -1)
 		close(buf->fd);
-
 	msgbuf->queued--;
 	ibuf_free(buf);
 }

@@ -80,28 +80,26 @@ imsg_init(struct imsgbuf *ibuf, int fd)
 ssize_t
 imsg_read(struct imsgbuf *ibuf)
 {
-	struct msghdr		 msg;
-	struct cmsghdr		*cmsg;
+	struct cmsghdr		*cmsg = NULL;
 	union {
 		struct cmsghdr hdr;
 		char	buf[CMSG_SPACE(sizeof(int) * 1)];
 	} cmsgbuf;
-	struct iovec		 iov;
+	struct iovec		 iov = {
+        .iov_base = ibuf->r.buf + ibuf->r.wpos
+      , .iov_len  = sizeof(ibuf->r.buf) - ibuf->r.wpos
+    };
+	struct msghdr		 msg = {
+        .msg_iov = &iov
+      , .msg_iovlen = 1
+      , .msg_control = &cmsgbuf.buf
+      , .msg_controllen = sizeof(cmsgbuf.buf)
+    };
 	ssize_t			 n = -1;
-	int			 fd;
-	struct imsg_fd		*ifd;
+	int			 fd = -1;
+	struct imsg_fd		*ifd = NULL;
 
-	memset(&msg, 0, sizeof(msg));
-	memset(&cmsgbuf, 0, sizeof(cmsgbuf));
-
-	iov.iov_base = ibuf->r.buf + ibuf->r.wpos;
-	iov.iov_len = sizeof(ibuf->r.buf) - ibuf->r.wpos;
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
-	msg.msg_control = &cmsgbuf.buf;
-	msg.msg_controllen = sizeof(cmsgbuf.buf);
-
-	if ((ifd = calloc(1, sizeof(struct imsg_fd))) == NULL)
+	if (!(ifd = calloc(1, sizeof(*ifd))))
 		return (-1);
 
 again:
@@ -219,7 +217,7 @@ int
 imsg_composev(struct imsgbuf *ibuf, u_int32_t type, u_int32_t peerid,
     pid_t pid, int fd, const struct iovec *iov, int iovcnt)
 {
-	struct ibuf	*wbuf;
+	struct ibuf	*wbuf = NULL;
 	int		 i, datalen = 0;
 
 	for (i = 0; i < iovcnt; i++)
@@ -329,7 +327,6 @@ void
 imsg_clear(struct imsgbuf *ibuf)
 {
 	int	fd;
-
 	msgbuf_clear(&ibuf->w);
 	while ((fd = imsg_get_fd(ibuf)) != -1)
 		close(fd);
