@@ -1369,14 +1369,15 @@ struct client {
 	TAILQ_HEAD(, message_entry) message_log;
 
 	char		*prompt_string;
-	struct utf8_data *prompt_buffer;
+	struct utf8_data*prompt_buffer;
 	size_t		 prompt_index;
 	int		 (*prompt_callbackfn)(void *, const char *, int);
 	void		 (*prompt_freefn)(void *);
 	void		*prompt_data;
 	u_int		 prompt_hindex;
 	enum { PROMPT_ENTRY, PROMPT_COMMAND } prompt_mode;
-
+        char           **complete_list;
+        int              complete_index;
 #define PROMPT_SINGLE 0x1
 #define PROMPT_NUMERIC 0x2
 #define PROMPT_INCREMENTAL 0x4
@@ -2202,7 +2203,7 @@ char	*default_window_name(struct window *);
 char	*parse_window_name(const char *);
 
 /* signal.c */
-void	set_signals(void(*)(int, short, void *), void *);
+void	set_signals(struct event_base *base, void(*)(int, short, void *), void *);
 void	clear_signals(int);
 
 /* control.c */

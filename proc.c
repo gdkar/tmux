@@ -30,8 +30,8 @@
 
 struct tmuxproc {
 	const char	 *name;
-	int		      exit;
-    struct event_base *base;
+	int		  exit;
+	struct event_base*base;
 	void		(*signalcb)(int);
 };
 
@@ -99,7 +99,6 @@ proc_event_cb(__unused int fd, short events, void *arg)
 
 	proc_update_event(peer);
 }
-
 static void
 proc_signal_cb(int signo, __unused short events, void *arg)
 {
@@ -135,8 +134,7 @@ proc_update_event(struct tmuxpeer *peer)
 	events = EV_READ;
 	if (peer->ibuf.w.queued > 0)
 		events |= EV_WRITE;
-	event_set(&peer->event, peer->ibuf.fd, events, proc_event_cb, peer);
-
+	event_assign(&peer->event,peer->parent->base, peer->ibuf.fd, events, proc_event_cb, peer);
 	event_add(&peer->event, NULL);
 }
 
@@ -202,9 +200,9 @@ proc_start(const char *name, struct event_base *base, int forkflag,
 
 	tp = xcalloc(1, sizeof *tp);
 	tp->name = xstrdup(name);
-
+	tp->base = base;
 	tp->signalcb = signalcb;
-	set_signals(proc_signal_cb, tp);
+	set_signals(base, proc_signal_cb, tp);
 
 	return (tp);
 }
@@ -214,7 +212,7 @@ proc_loop(struct tmuxproc *tp, int (*loopcb)(void))
 {
 	log_debug("%s loop enter", tp->name);
 	do
-		event_loop(EVLOOP_ONCE);
+		event_base_loop(tp->base,EVLOOP_ONCE);
 	while (!tp->exit && (loopcb == NULL || !loopcb ()));
 	log_debug("%s loop exit", tp->name);
 }
@@ -238,7 +236,7 @@ proc_add_peer(struct tmuxproc *tp, int fd,
 	peer->arg = arg;
 
 	imsg_init(&peer->ibuf, fd);
-	event_set(&peer->event, fd, EV_READ, proc_event_cb, peer);
+	event_assign(&peer->event,tp->base, fd, EV_READ, proc_event_cb, peer);
 
 	log_debug("add peer %p: %d (%p)", peer, fd, arg);
 

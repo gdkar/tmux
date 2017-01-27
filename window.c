@@ -979,10 +979,14 @@ window_pane_wmark_timer(__unused int fd, __unused short events, void *arg)
     struct window_pane *wp = arg;
     wp->flags &= ~PANE_DROP;
     wp->flags |=  PANE_REDRAW;
+    server_redraw_window(wp->window);
     if(!wp->wmark_hits)
         evtimer_del(&wp->wmark_timer);
     else {
         evtimer_add(&wp->wmark_timer, &tv);
+        wp->flags |=  PANE_DROP;
+        wp->flags &= ~PANE_REDRAW;
+
     }
 }
 
@@ -997,10 +1001,10 @@ window_pane_read_callback(__unused struct bufferevent *bufev, void *data)
     struct timeval tv = { .tv_usec = 64000 };
 
     if (size > READ_FULL_SIZE) {
-        if(wp->wmark_hits < 128)
-            wp->wmark_hits += 4;
+        if(wp->wmark_hits < 64)
+            wp->wmark_hits ++;
         if(!(wp->flags & PANE_DROP)) {
-            if(wp->wmark_hits >= 8) {
+            if(wp->wmark_hits >= 2) {
                 wp->flags |= PANE_DROP;
                 wp->flags &= ~PANE_REDRAW;
                 if (event_initialized(&wp->wmark_timer))

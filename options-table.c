@@ -323,6 +323,13 @@ const struct options_table_entry options_table[] = {
 	  .maximum = SHRT_MAX,
 	  .default_num = 500
 	},
+	{ .name = "resize-time",
+	  .type = OPTIONS_TABLE_NUMBER,
+	  .scope = OPTIONS_TABLE_SERVER,
+	  .minimum = 0,
+	  .maximum = INT_MAX,
+	  .default_num = (1000000/60),
+	},
 
 	{ .name = "set-titles",
 	  .type = OPTIONS_TABLE_FLAG,

@@ -32,7 +32,7 @@ static struct event	ev_sigusr1;
 static struct event	ev_sigwinch;
 
 void
-set_signals(void (*handler)(int, short, void *), void *arg)
+set_signals(struct event_base *base, void (*handler)(int, short, void *), void *arg)
 {
 	struct sigaction	sigact;
 
@@ -49,18 +49,18 @@ set_signals(void (*handler)(int, short, void *), void *arg)
 	if (sigaction(SIGTSTP, &sigact, NULL) != 0)
 		fatal("sigaction failed");
 
-	signal_set(&ev_sighup, SIGHUP, handler, arg);
-	signal_add(&ev_sighup, NULL);
-	signal_set(&ev_sigchld, SIGCHLD, handler, arg);
-	signal_add(&ev_sigchld, NULL);
-	signal_set(&ev_sigcont, SIGCONT, handler, arg);
-	signal_add(&ev_sigcont, NULL);
-	signal_set(&ev_sigterm, SIGTERM, handler, arg);
-	signal_add(&ev_sigterm, NULL);
-	signal_set(&ev_sigusr1, SIGUSR1, handler, arg);
-	signal_add(&ev_sigusr1, NULL);
-	signal_set(&ev_sigwinch, SIGWINCH, handler, arg);
-	signal_add(&ev_sigwinch, NULL);
+	evsignal_assign(&ev_sighup, base, SIGHUP, handler, arg);
+	evsignal_add(&ev_sighup, NULL);
+	evsignal_assign(&ev_sigchld, base, SIGCHLD, handler, arg);
+	evsignal_add(&ev_sigchld, NULL);
+	evsignal_assign(&ev_sigcont, base, SIGCONT, handler, arg);
+	evsignal_add(&ev_sigcont, NULL);
+	evsignal_assign(&ev_sigterm, base, SIGTERM, handler, arg);
+	evsignal_add(&ev_sigterm, NULL);
+	evsignal_assign(&ev_sigusr1, base, SIGUSR1, handler, arg);
+	evsignal_add(&ev_sigusr1, NULL);
+	evsignal_assign(&ev_sigwinch, base, SIGWINCH, handler, arg);
+	evsignal_add(&ev_sigwinch, NULL);
 }
 
 void
