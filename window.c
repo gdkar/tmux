@@ -1000,22 +1000,29 @@ window_pane_read_callback(__unused struct bufferevent *bufev, void *data)
 	size_t			 new_size;
     struct timeval tv = { .tv_usec = 64000 };
 
-    if (size > READ_FULL_SIZE) {
-        if(wp->wmark_hits < 64)
-            wp->wmark_hits ++;
-        if(!(wp->flags & PANE_DROP)) {
-            if(wp->wmark_hits >= 2) {
-                wp->flags |= PANE_DROP;
-                wp->flags &= ~PANE_REDRAW;
-                if (event_initialized(&wp->wmark_timer))
-                    evtimer_del(&wp->wmark_timer);
-                evtimer_set(&wp->wmark_timer, window_pane_wmark_timer, wp);
-                evtimer_add(&wp->wmark_timer, &tv);
+    if(wp->saved_grid) {
+        wp->flags &= !PANE_DROP;
+        wp->wmark_hits = 0;
+    }else{
+        if (size > READ_FULL_SIZE) {
+            if(wp->wmark_hits < 64)
+                wp->wmark_hits ++;
+            if(!(wp->flags & PANE_DROP)) {
+                if(wp->wmark_hits >= 8) {
+                    wp->flags |= PANE_DROP;
+                    wp->flags &= ~PANE_REDRAW;
+                    if (event_initialized(&wp->wmark_timer))
+                        evtimer_del(&wp->wmark_timer);
+                    evtimer_set(&wp->wmark_timer, window_pane_wmark_timer, wp);
+                    evtimer_add(&wp->wmark_timer, &tv);
+                }else if(wp->wmark_hits >= 2) {
+                    wp->flags |= PANE_REDRAW;
+                }
             }
+        } else {
+            if(wp->wmark_hits)
+                wp->wmark_hits--;
         }
-    } else {
-        if(wp->wmark_hits)
-            wp->wmark_hits--;
     }
 	log_debug("%%%u has %zu bytes (of %u, %u hits)", wp->id, size,
 	    READ_FULL_SIZE, wp->wmark_hits);
@@ -1087,6 +1094,8 @@ window_pane_alternate_on(struct window_pane *wp, struct grid_cell *gc,
 	wp->base.grid->flags &= ~GRID_HISTORY;
 
 	wp->flags |= PANE_REDRAW;
+    wp->flags &= !PANE_DROP;
+    evtimer_del(&wp->wmark_timer);
 }
 
 /* Exit alternate screen mode and restore the copied grid. */
