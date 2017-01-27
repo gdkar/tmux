@@ -30,8 +30,8 @@
 
 struct tmuxproc {
 	const char	 *name;
-	int		  exit;
-
+	int		      exit;
+    struct event_base *base;
 	void		(*signalcb)(int);
 };
 
@@ -198,7 +198,7 @@ proc_start(const char *name, struct event_base *base, int forkflag,
 	log_debug("%s started (%ld): version %s, socket %s, protocol %d", name,
 	    (long)getpid(), VERSION, socket_path, PROTOCOL_VERSION);
 	log_debug("on %s %s %s; libevent %s (%s)", u.sysname, u.release,
-	    u.version, event_get_version(), event_get_method());
+	    u.version, event_get_version(), event_base_get_method(base));
 
 	tp = xcalloc(1, sizeof *tp);
 	tp->name = xstrdup(name);

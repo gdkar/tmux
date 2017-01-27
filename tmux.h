@@ -68,6 +68,18 @@ struct tmuxproc;
 
 /* Maximum size of data to hold from a pane. */
 #define READ_SIZE 4096
+/*
+ * Event watermarks. We start with FAST then if we hit full size for HITS reads
+ * in succession switch to SLOW, and return when we hit EMPTY the same number
+ * of times.
+ */
+#define READ_FAST_SIZE 16384
+#define READ_SLOW_SIZE 128
+
+#define READ_FULL_SIZE ((READ_FAST_SIZE) - 16)
+#define READ_EMPTY_SIZE 16
+
+#define READ_CHANGE_HITS 3
 
 /* Attribute to make GCC check printf-like arguments. */
 #define printflike(a, b) __attribute__ ((format (printf, a, b)))
@@ -759,7 +771,6 @@ struct window_pane {
 	struct event	 resize_timer;
 
     struct event     wmark_timer;
-//	u_int		     wmark_size;
 	u_int		     wmark_hits;
 
 	struct input_ctx *ictx;
