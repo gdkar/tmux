@@ -17,6 +17,9 @@
 #ifndef COMPAT_H
 #define COMPAT_H
 
+#include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 

@@ -62,7 +62,7 @@ start_cfg(void)
 	int		 quiet = 0;
 
 	cfg_client = TAILQ_FIRST(&clients);
-	if (cfg_client != NULL)
+	if (cfg_client )
 		cfg_client->references++;
 
 	load_cfg(TMUX_CONF, cfg_client, NULL, 1);

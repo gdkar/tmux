@@ -27,8 +27,8 @@
 char *
 fgetln(FILE *fp, size_t *len)
 {
-	static char *buf = NULL;
-	static size_t bufsz = 0;
+	static _Thread_local char *buf = NULL;
+	static _Thread_local size_t bufsz = 0;
 	size_t r = 0;
 	char *p;
 	int c, e;

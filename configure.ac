@@ -27,6 +27,12 @@ AC_PROG_EGREP
 AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 
+AX_PTHREAD
+LIBS+=" ${PTHREAD_LIBS}"
+CFLAGS+=" ${PTHREAD_CFLAGS}"
+CPPFLAGS+=" ${PTHREAD_CPPFLAGS}"
+LDFLAGS+=" ${PTHREAD_LDFLAGS}"
+
 # Default tmux.conf goes in /etc not ${prefix}/etc.
 test "$sysconfdir" = '${prefix}/etc' && sysconfdir=/etc
 
