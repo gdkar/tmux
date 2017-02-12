@@ -962,9 +962,6 @@ window_pane_spawn(struct window_pane *wp, int argc, char **argv,
 //	wp->event = bufferevent_new(wp->fd, window_pane_read_callback, NULL,
 //	    window_pane_error_callback, wp);
 
-	wp->event = bufferevent_new(wp->fd, window_pane_read_callback, NULL,
-	    window_pane_error_callback, wp);
-
 	bufferevent_setwatermark(wp->event, EV_READ, 0, READ_SIZE);
 	bufferevent_enable(wp->event, EV_READ|EV_WRITE);
 
@@ -1044,7 +1041,6 @@ window_pane_error_callback(__unused struct bufferevent *bufev,
     __unused short what, void *data)
 {
 	struct window_pane *wp = data;
-
 	server_destroy_pane(wp, 1);
 }
 
@@ -1056,8 +1052,8 @@ window_pane_resize(struct window_pane *wp, u_int sx, u_int sy)
 	wp->sx = sx;
 	wp->sy = sy;
 
-	screen_resize(&wp->base, sx, sy, wp->saved_grid == NULL);
-	if (wp->mode != NULL)
+	screen_resize(&wp->base, sx, sy, !wp->saved_grid);
+	if (wp->mode)
 		wp->mode->resize(wp, sx, sy);
 
 	wp->flags |= PANE_RESIZE;
